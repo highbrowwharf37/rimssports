@@ -11,11 +11,12 @@ BROWSER_HEADERS = {
 }
 
 
-def fetch_json(url, attempts=4):
+def fetch_json(url, attempts=4, extra_headers=None):
+    headers = {**BROWSER_HEADERS, **(extra_headers or {})}
     last_err = None
     for i in range(attempts):
         try:
-            req = urllib.request.Request(url, headers=BROWSER_HEADERS)
+            req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=30) as r:
                 return json.loads(r.read().decode())
         except Exception as e:
@@ -26,7 +27,7 @@ def fetch_json(url, attempts=4):
     # Cloudflare's bot check where Python does not.
     try:
         header_args = []
-        for k, v in BROWSER_HEADERS.items():
+        for k, v in headers.items():
             header_args += ['-H', f'{k}: {v}']
         out = subprocess.run(
             ['curl', '-sfL', '--max-time', '60', *header_args, url],
@@ -66,12 +67,11 @@ def fetch_cbbd(path):
     key = os.environ.get('CBB_DATA_API_KEY', '')
     if not key:
         raise RuntimeError('CBB_DATA_API_KEY not set')
-    req = urllib.request.Request(
+    return fetch_json(
         'https://api.collegebasketballdata.com' + path,
-        headers={'Authorization': f'Bearer {key}', 'Accept': 'application/json'}
+        attempts=2,
+        extra_headers={'Authorization': f'Bearer {key}'}
     )
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.loads(r.read().decode())
 
 
 def teams_from_cbbd(existing_rows):
