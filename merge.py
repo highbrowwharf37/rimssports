@@ -1,4 +1,4 @@
-import json, datetime, os, sys, time, urllib.request, urllib.parse
+import json, datetime, os, subprocess, sys, time, urllib.request, urllib.parse
 
 BROWSER_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
@@ -22,6 +22,20 @@ def fetch_json(url, attempts=4):
             last_err = e
             print(f"Attempt {i + 1}/{attempts} failed for {url}: {e}")
             time.sleep(5 * (i + 1))
+    # curl has a different TLS fingerprint than urllib and sometimes passes
+    # Cloudflare's bot check where Python does not.
+    try:
+        header_args = []
+        for k, v in BROWSER_HEADERS.items():
+            header_args += ['-H', f'{k}: {v}']
+        out = subprocess.run(
+            ['curl', '-sfL', '--max-time', '60', *header_args, url],
+            capture_output=True, check=True
+        )
+        print(f"curl fallback succeeded for {url}")
+        return json.loads(out.stdout.decode())
+    except Exception as e:
+        print(f"curl fallback failed for {url}: {e}")
     raise last_err
 
 
