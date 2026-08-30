@@ -62,9 +62,73 @@ try:
 except Exception as e:
     print(f"NCAA failed: {e}")
 
+def fetch_cbbd(path):
+    key = os.environ.get('CBB_DATA_API_KEY', '')
+    if not key:
+        raise RuntimeError('CBB_DATA_API_KEY not set')
+    req = urllib.request.Request(
+        'https://api.collegebasketballdata.com' + path,
+        headers={'Authorization': f'Bearer {key}', 'Accept': 'application/json'}
+    )
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.loads(r.read().decode())
+
+
+def teams_from_cbbd(existing_rows):
+    """Rebuild Barttorvik-format rows from collegebasketballdata.com.
+
+    Only some columns exist there (name, conf, record, adjOE, adjDE, pace),
+    so start from the last known Barttorvik row per team and update those,
+    preserving fields like SoS/WAB that CBBD does not provide.
+    """
+    ratings = fetch_cbbd('/ratings/adjusted?season=2026')
+    stats = {s['team']: s for s in fetch_cbbd('/stats/team/season?season=2026')}
+    print(f"CBBD: {len(ratings)} ratings, {len(stats)} stat lines")
+    prev = {r[1]: r for r in existing_rows if isinstance(r, list) and len(r) > 44}
+
+    rows = []
+    for t in ratings:
+        name = t.get('team')
+        oe, de = t.get('offensiveRating'), t.get('defensiveRating')
+        if not name or oe is None or de is None:
+            continue
+        st = stats.get(name, {})
+        w = int(st.get('wins') or 0)
+        l = int(st.get('losses') or 0)
+        row = list(prev[name]) if name in prev else [0] * 45
+        row[1] = name
+        row[2] = t.get('conference') or row[2]
+        row[3] = f"{w}-{l}"
+        row[4] = oe
+        row[6] = de
+        row[8] = oe ** 11.5 / (oe ** 11.5 + de ** 11.5)  # barthag
+        row[10], row[11] = float(w), float(l)
+        if st.get('pace'):
+            row[44] = st['pace']
+        rows.append(row)
+    rows.sort(key=lambda r: -r[8])
+    for i, row in enumerate(rows):
+        row[0] = i + 1
+    return rows
+
+
 if teams is None:
-    # Blocked (e.g. Cloudflare 403 on GitHub runner IPs): keep the existing
-    # data.json instead of failing the whole run.
+    # Barttorvik blocks GitHub runner IPs via Cloudflare; rebuild from the
+    # collegebasketballdata.com API instead.
+    existing = []
+    if os.path.exists('data.json'):
+        try:
+            existing = json.load(open('data.json')).get('teams', [])
+        except Exception:
+            pass
+    try:
+        teams = teams_from_cbbd(existing)
+        print(f"Total teams (via CBBD): {len(teams)}")
+    except Exception as e:
+        print(f"CBBD fallback failed: {e}")
+
+if not teams:
+    # Keep the existing data.json instead of failing the whole run.
     if os.path.exists('data.json'):
         print("Keeping existing data.json; skipping update.")
         sys.exit(0)
