@@ -12,7 +12,7 @@ jobs:
 
       - name: Fetch Barttorvik data
         env:
-          CBB_DATA_API_KEY: ${{ secrets.CBB_DATA_API_KEY }}
+          CBB_DATA_API_KEY: ${{ secrets.CBB_API_KEY }}
         run: python3 merge.py
 
       - name: Commit data

@@ -32,13 +32,13 @@ jobs:
 
       - name: Fetch AP Poll rankings
         env:
-          CBB_DATA_API_KEY: ${{ secrets.CBB_DATA_API_KEY }}
+          CBB_DATA_API_KEY: ${{ secrets.CBB_API_KEY }}
         run: |
           cbb --rankings --season 2026 --output-dir /tmp/cbb-out || true
 
       - name: Fetch today's scores
         env:
-          CBB_DATA_API_KEY: ${{ secrets.CBB_DATA_API_KEY }}
+          CBB_DATA_API_KEY: ${{ secrets.CBB_API_KEY }}
         run: |
           TODAY=$(date -u +%Y-%m-%d)
           YESTERDAY=$(date -u -d "yesterday" +%Y-%m-%d)
@@ -46,7 +46,7 @@ jobs:
 
       - name: Fetch today's betting lines
         env:
-          CBB_DATA_API_KEY: ${{ secrets.CBB_DATA_API_KEY }}
+          CBB_DATA_API_KEY: ${{ secrets.CBB_API_KEY }}
         run: |
           TODAY=$(date -u +%Y-%m-%d)
           TOMORROW=$(date -u -d "tomorrow" +%Y-%m-%d)
